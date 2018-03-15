@@ -1,5 +1,7 @@
 const winston = require('winston');
 const axios = require('axios');
+const util = require('util')
+const exec = require('child_process').exec;
 
 const logger = winston.createLogger({
   level: 'info',
@@ -11,17 +13,27 @@ const logger = winston.createLogger({
 
 class Command {
 
-  constructor(url, path, timeout, methType) {
+  constructor(command) {
 
-    this.options = {
-      url: url,
-      path: path,
-      timeout: timeout,
-      method: methType,
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    };
+    // if 'command' field is present, run it as a bash command
+    // else assume it is a rest request
+    if (command.configuration != null && command.configuration.command != null) {
+      logger.log('info', 'Detected a shell command:' + command.configuration.command);
+      this.isCommand = true;
+      this.toBeRun = command.configuration.command;
+    } else {
+      logger.log('info', 'Detected a REST request: %s', command);
+      this.isCommand = false;
+      this.options = {
+        url: command.url,
+        path: command.path,
+        timeout: command.timeout,
+        method: command.methType,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      };
+    }
   }
 
   printInfo() {
@@ -32,17 +44,35 @@ class Command {
   }
 
   // send the request
-  execute() {
+  execute(dryRun) {
 
-    logger.log('info', 'Sending request...');
+    logger.log('info', 'Executing...');
 
-    axios(this.options).then(function(response){
-      logger.log('info', "the thing happened");
-      logger.log('info', response.data);
-      logger.log('info', response.status);
-    }).catch(function (error) {
-    logger.log('error', (error));
-  });
+    if (this.isCommand) {
+      if (dryRun === true) {
+        logger.log('info', 'Dry run! Would have run a command: %s', this.toBeRun);
+      } else {
+        exec(this.toBeRun, function (error, stdout, stderr) {
+          logger.log('info', 'success: %s', stdout);
+          logger.log('error', 'error: %s', stderr);
+          if (error !== null) {
+            logger.log('error' + error);
+          }
+        });
+      }
+    } else {
+      if (dryRun === true) {
+        logger.log('info', 'Dry run! Would have sent request with parameters: ');
+        this.printInfo();
+      } else {
+        axios(this.options).then(function(response){
+          logger.log('info', response.data);
+          logger.log('info', response.status);
+        }).catch(function (error) {
+          logger.log('error', (error));
+        });
+      }
+    }
   }
 
 
