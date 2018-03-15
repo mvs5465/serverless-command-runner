@@ -12,7 +12,7 @@ const logger = winston.createLogger({
 });
 
 // Env configuration
-const { LOG_LEVEL = 'error', DRY_RUN = true, FILE_PATH = './files/sample.yaml'} = process.env;
+const { LOG_LEVEL = 'error', DRY_RUN = false, FILE_PATH = './files/sample.yaml'} = process.env;
 
 var main = function(){
 
@@ -21,7 +21,7 @@ var main = function(){
     // parse the yaml into a JS object
     doc = yaml.safeLoad(fs.readFileSync('./files/sample.yaml', 'utf8'));
   } catch (e) {
-    logger.log('error', 'Unable to parse YAML: %s', e);
+    logger.log('error', `Unable to parse YAML: ${e}`);
     return -1;
   }
 
@@ -35,9 +35,9 @@ var main = function(){
 
   commands.map(command => {
     var actualCall = new Command(command);
-    logger.log('info', 'Dry run? %s', DRY_RUN);
-    actualCall.execute(DRY_RUN); // TODO replace this with env var
-  })
+    logger.log('info', `Dry run? ${DRY_RUN}`);
+    actualCall.execute(false); // TODO replace this with env var
+  });
 
 }
 
@@ -55,7 +55,7 @@ if (require.main === module) {
 /// ( x ) logging libraries? = winston
 /// ( x ) dry run
 /// ( x ) -- if dry run --> env var? --> dont do anything, just log what you would have done
-/// (   ) Find out if it is a URL or bash command?
+/// ( x ) Find out if it is a URL or bash command?
 
 /// ( ) add a field for headers
 /// ( ) validate ssl certificaties (skip for now)

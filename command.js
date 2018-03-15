@@ -18,29 +18,36 @@ class Command {
     // if 'command' field is present, run it as a bash command
     // else assume it is a rest request
     if (command.configuration != null && command.configuration.command != null) {
-      logger.log('info', 'Detected a shell command:' + command.configuration.command);
+      logger.log('info', `Detected a shell command: ${command.configuration.command}`);
       this.isCommand = true;
       this.toBeRun = command.configuration.command;
     } else {
-      logger.log('info', 'Detected a REST request: %s', command);
+      logger.log('info', `Detected a REST request: ${command}`);
       this.isCommand = false;
+
+      const domain = command.remoteUrl.match('.*(?=\\$)');
+      const endpoint = command.remoteUrl.match('/api/.*');
+
+      logger.log('info', `DOMAIN: ${domain}`);
+      logger.log('info', `ENDPOINT: ${endpoint}`);
+
+      const headers = command.headers || {'Content-Type': 'application/json'};
+
       this.options = {
-        url: command.url,
-        path: command.path,
+        url: domain + 'google.com',
+        path: endpoint,
         timeout: command.timeout,
-        method: command.methType,
-        headers: {
-          'Content-Type': 'application/json'
-        }
+        method: command.method,
+        headers: headers
       };
     }
   }
 
   printInfo() {
-    logger.log('info', 'Url: ' + this.options.url);
-    logger.log('info', 'Resource path: ' + this.options.path);
-    logger.log('info', 'Timeout: ' + this.options.timeout);
-    logger.log('info', 'Type: ' + this.options.method);
+    logger.log('info', `Url: ${this.options.url}`);
+    logger.log('info', `Resource path: ${this.options.path}`);
+    logger.log('info', `Timeout: ${this.options.timeout}`);
+    logger.log('info', `Type: ${this.options.method}`);
   }
 
   // send the request
@@ -50,15 +57,17 @@ class Command {
 
     if (this.isCommand) {
       if (dryRun === true) {
-        logger.log('info', 'Dry run! Would have run a command: %s', this.toBeRun);
+        logger.log('info', `Dry run! Would have run a command: ${this.toBeRun}`);
       } else {
-        exec(this.toBeRun, function (error, stdout, stderr) {
-          logger.log('info', 'success: %s', stdout);
-          logger.log('error', 'error: %s', stderr);
-          if (error !== null) {
-            logger.log('error' + error);
-          }
-        });
+        if(false) { // TODO - variable replacement messes this up
+          exec(this.toBeRun, function (error, stdout, stderr) {
+            logger.log('info', 'success: %s', stdout);
+            logger.log('error', 'error: %s', stderr);
+            if (error !== null) {
+              logger.log(`error: ${error}`);
+            }
+          });
+        }
       }
     } else {
       if (dryRun === true) {
@@ -66,9 +75,12 @@ class Command {
         this.printInfo();
       } else {
         axios(this.options).then(function(response){
-          logger.log('info', response.data);
-          logger.log('info', response.status);
+          if (this.options.printResponse) {
+            logger.log('info', response.data);
+            logger.log('info', response.status);
+          }
         }).catch(function (error) {
+          console.log('error: ' + error);
           logger.log('error', (error));
         });
       }
