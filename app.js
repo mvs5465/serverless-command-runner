@@ -1,77 +1,81 @@
-const logger = require('winston');
+const winston = require('winston');
 const yaml = require('js-yaml');
 const fs   = require('fs');
-const Command = require("./command.js");
+const RestRequest = require('./RestRequest.js');
+const ShellCommand = require('./ShellCommand.js');
 
+const logger = winston.createLogger({
+  //level: 'info',
+  format: winston.format.json(),
+  transports: [
+    new winston.transports.Console()
+  ]
+});
 
+// Env configuration
+const { LOG_LEVEL = 'error', DRY_RUN = false, FILE_PATH = './files/sample2.yaml'} = process.env;
 
 var main = function(){
-  
+
+  console.log(`FILE PATH: ${FILE_PATH}`);
+  console.log(`DRY RUN: ${DRY_RUN}`);
+
   let doc = null;
   try {
     // parse the yaml into a JS object
-    doc = yaml.safeLoad(fs.readFileSync('./files/sample.yaml', 'utf8'));
+    doc = yaml.safeLoad(fs.readFileSync(FILE_PATH, 'utf8'));
   } catch (e) {
-    logger.error('Unable to parse YAML: %s', e);
-  }
-  
-  if (doc === null) {
-    logger.error('Unable to parse YAML: null');
+    logger.log('error', `Unable to parse YAML: ${e}`);
     return -1;
   }
-  
+
   let commands = doc[1].commands;
-  
+
   commands.map(command => {
-      actualCall = new Command(command.remoteUrl, "", command.timeout, command.method);
-      actualCall.printInfo();
-      actualCall.execute();
-    })
-  
-    /*
-  for (var i = 0; i < commands.length; i++) {
-    console.log('remoteurl: ' + commands[i].remoteUrl);
-    var actualCall = new Command(commands[i].remoteUrl, "", commands[i].timeout, commands[i].method);
-    actualCall.printInfo();
-  }
-  */
-  
+
+    if (command.configuration != null && command.configuration.command != null) {
+      // logger.log('info', `Detected a shell command: ${command.configuration.command}`);
+      // var command = new ShellCommand(command.configuration.command, DRY_RUN);
+      // command.execute();
+    } else {
+      logger.log('info', `Detected a REST request: ${command}`);
+      // url, path, timeout, method, headers, checkResponseCode
+      var parsedUrl = parseUrl(command.remoteUrl);
+      const headers = command.headers || {'Content-Type': 'application/json'};
+      // url, path, timeout, method, headers, checkResponseCode, retries, printResponse
+      var rcmd = new RestRequest(parsedUrl[0] + 'google.com', parsedUrl[1], command.timeout, command.method, headers, command.retries, command.checkResponseCode);
+      rcmd.execute();
+    }
+
+  });
+}
+
+function parseUrl(url) {
+  const domain = url.match('.*(?=\\$)');
+  //const endpoint = url.match('/api/.*');
+  const endpoint = 'index.html';
+
+  logger.log('info', `DOMAIN: ${domain}`);
+  logger.log('info', `ENDPOINT: ${endpoint}`);
+
+  return [domain, endpoint];
 }
 
 if (require.main === module) {
   main();
 }
 
-
-
-
-
 ///////////////
 //// NOTES ////
 ///////////////
 
 
-/// JSON LOGS
-/// LOG level
-// logging libraries? = winston
-// dry run
-// -- if dry run --> env var? --> dont do anything, just log what you would have done
+/// ( x ) JSON LOGS
+/// ( x ) LOG level
+/// ( x ) logging libraries? = winston
+/// ( x ) dry run
+/// ( x ) -- if dry run --> env var? --> dont do anything, just log what you would have done
+/// ( x ) Find out if it is a URL or bash command?
 
-// add a field for headers
-// validate ssl certificaties (skip for now)
-
-
-
-// create object that has all relevant fields of command
-// autoparse into fields?
-
-// validate urls
-// validate fields
-
-// iterate over commands
-// create an object for each command
-// execute each command
-
-// save responses of each command
-// send them async?
-
+/// ( ) add a field for headers
+/// ( ) validate ssl certificaties (skip for now)
