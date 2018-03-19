@@ -1,10 +1,11 @@
 const winston = require('winston');
 const yaml = require('js-yaml');
 const fs   = require('fs');
-const Command = require("./command.js");
+const RestRequest = require('./RestRequest.js');
+const ShellCommand = require('./ShellCommand.js');
 
 const logger = winston.createLogger({
-  level: 'info',
+  //level: 'info',
   format: winston.format.json(),
   transports: [
     new winston.transports.Console()
@@ -12,33 +13,52 @@ const logger = winston.createLogger({
 });
 
 // Env configuration
-const { LOG_LEVEL = 'error', DRY_RUN = false, FILE_PATH = './files/sample.yaml'} = process.env;
+const { LOG_LEVEL = 'error', DRY_RUN = false, FILE_PATH = './files/sample2.yaml'} = process.env;
 
 var main = function(){
+
+  console.log(`FILE PATH: ${FILE_PATH}`);
+  console.log(`DRY RUN: ${DRY_RUN}`);
 
   let doc = null;
   try {
     // parse the yaml into a JS object
-    doc = yaml.safeLoad(fs.readFileSync('./files/sample.yaml', 'utf8'));
+    doc = yaml.safeLoad(fs.readFileSync(FILE_PATH, 'utf8'));
   } catch (e) {
     logger.log('error', `Unable to parse YAML: ${e}`);
     return -1;
   }
 
-  // TODO unnecessary?
-  // if (doc === null) {
-  //   logger.log('error', 'Unable to parse YAML: null');
-  //   return -1;
-  // }
-
   let commands = doc[1].commands;
 
   commands.map(command => {
-    var actualCall = new Command(command);
-    logger.log('info', `Dry run? ${DRY_RUN}`);
-    actualCall.execute(false); // TODO replace this with env var
-  });
 
+    if (command.configuration != null && command.configuration.command != null) {
+      // logger.log('info', `Detected a shell command: ${command.configuration.command}`);
+      // var command = new ShellCommand(command.configuration.command, DRY_RUN);
+      // command.execute();
+    } else {
+      logger.log('info', `Detected a REST request: ${command}`);
+      // url, path, timeout, method, headers, checkResponseCode
+      var parsedUrl = parseUrl(command.remoteUrl);
+      const headers = command.headers || {'Content-Type': 'application/json'};
+      // url, path, timeout, method, headers, checkResponseCode, retries, printResponse
+      var rcmd = new RestRequest(parsedUrl[0] + 'google.com', parsedUrl[1], command.timeout, command.method, headers, command.retries, command.checkResponseCode);
+      rcmd.execute();
+    }
+
+  });
+}
+
+function parseUrl(url) {
+  const domain = url.match('.*(?=\\$)');
+  //const endpoint = url.match('/api/.*');
+  const endpoint = 'index.html';
+
+  logger.log('info', `DOMAIN: ${domain}`);
+  logger.log('info', `ENDPOINT: ${endpoint}`);
+
+  return [domain, endpoint];
 }
 
 if (require.main === module) {
